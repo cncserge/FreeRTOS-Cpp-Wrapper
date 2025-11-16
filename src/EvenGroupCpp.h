@@ -19,7 +19,7 @@ class EventGroup {
             owned = false;
             // на случай, если configASSERT ничего не делает
             // можно повиснуть, перезагрузиться или хотя бы не использовать объект
-            // for(;;) {}  // или 
+            // for(;;) {}  // или
             abort();
         }
     }
@@ -110,6 +110,22 @@ class EventGroup {
         return handle;
     }
 
+  protected:
+    static constexpr unsigned MaxUserBits = sizeof(EventBits_t) * 8u - 8u;  // 24 бита при 32-битном EventBits_t
+
+    // Компайлтайм-вариант для enum'ов
+    template <unsigned N>
+    static constexpr EventBits_t getBit() {
+        static_assert(N < MaxUserBits,"EventGroup::getBit<N>(): bit index out of range");
+        return static_cast<EventBits_t>(EventBits_t(1u) << N);
+    }
+
+    // Рантайм-вариант для переменных
+    static EventBits_t getBit(unsigned n) {
+        configASSERT(n < MaxUserBits);
+        return static_cast<EventBits_t>(EventBits_t(1u) << n);
+    }
+
   private:
     EventGroupHandle_t handle = nullptr;
     bool               owned = false;
@@ -125,22 +141,33 @@ class EventGroup {
 #endif  // EVEN_GROUP_CPP_H
 
 /*
-EventGroup events;
-
+class MyEventGroup : public EventGroup {
+public:
+  MyEventGroup() : EventGroup() {}
+  enum {
+    door_open = getBit<0>(),
+    door_closed = getBit<1>(),
+    level_high = getBit<2>(),
+  };
+    EventBits_t maskFromIndex(unsigned i) {
+        return getBit(i);  // рантайм-вариант
+    }
+};
+MyEventGroup event;
 // Задача-производитель
 void producerTask(void*) {
     for (;;) {
         // ... что-то сделали
-        events.setBits(1 << 0);  // выставили флаг "готово"
+        event.setBits(MyEventGroup::door_open);  // выставили флаг "готово"
     }
 }
 
 // Задача-потребитель
 void consumerTask(void*) {
     for (;;) {
-        // ждём бит 0, все/любой = всё равно один бит, не очищаем, таймаут 1000 мс
-        EventBits_t bits = events.waitBits(1 << 0, true, false, 1000);
-        if (bits & (1 << 0)) {
+        // ждём бит door_open, все/любой = всё равно один бит, не очищаем, таймаут 1000 мс
+        EventBits_t bits = event.waitBits(MyEventGroup::door_open, true, false, 1000);
+        if (bits & MyEventGroup::door_open) {
             // обработать событие
         }
     }
