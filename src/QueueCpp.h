@@ -46,7 +46,9 @@ class QueueBase {
         return handle;
     }
     virtual ~QueueBase() {
-        vQueueDelete(handle);
+        if (handle) {
+            vQueueDelete(handle);
+        }
     }
 
   protected:
@@ -121,7 +123,11 @@ class Queue : public QueueTypeBase<T> {
     Queue(size_t length)
         : QueueTypeBase<T>(xQueueCreate(length, sizeof(T))) {
         if (this->handle == nullptr) {
-            throw std::runtime_error("Failed to create queue");
+            configASSERT(false && "Failed to create queue");
+            // на случай, если configASSERT ничего не делает
+            // можно повиснуть, перезагрузиться или хотя бы не использовать объект
+            // for(;;) {}  // или 
+            abort();
         }
     };
 };
